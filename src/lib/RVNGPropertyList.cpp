@@ -19,101 +19,80 @@
  * applicable instead of those above.
  */
 
+#include "librevenge.h"
+
 #include <map>
+#include <memory>
 #include <string>
 #include <utility>
-#include <boost/spirit/include/classic.hpp>
-#include <librevenge/librevenge.h>
+
 
 namespace
 {
 
-bool findDouble(const librevenge::RVNGString &str, double &res, librevenge::RVNGUnit &unit)
+bool findDouble(const librevenge::RVNGString &/*str*/, double &/*res*/, librevenge::RVNGUnit &/*unit*/)
 {
-	using namespace ::boost::spirit::classic;
+	return false;
 
-	if (str.empty())
-		return false;
+	// TODO: section deleted because we wanted to not depend by boost
+	// if this portion is important, implement: phrase_parse(first, last, int_, space, res)
 
-	unit = librevenge::RVNG_GENERIC;
-	bool unitIsCM=false, unitIsMM=false;
-	if (!parse(str.cstr(),
-	           //  Begin grammar
-	           (
-	               real_p[assign_a(res)] >>
-	               (
-	                   str_p("pt")[assign_a(unit,librevenge::RVNG_POINT)]
-	                   |
-	                   str_p("in")[assign_a(unit,librevenge::RVNG_INCH)]
-	                   |
-	                   str_p("%")[assign_a(unit,librevenge::RVNG_PERCENT)]
-	                   |
-	                   str_p("*")[assign_a(unit,librevenge::RVNG_TWIP)]
-	                   |
-	                   str_p("cm")[assign_a(unitIsCM,true)]
-	                   |
-	                   str_p("mm")[assign_a(unitIsMM,true)]
-	                   |
-	                   eps_p
-	               )
-	           ) >> end_p,
-	           //  End grammar
-	           space_p).full)
-	{
-		return false;
-	}
+	//if (str.empty())
+	//	return false;
 
-	if (unit == librevenge::RVNG_PERCENT)
-		res /= 100.0;
-	else if (unitIsCM)
-	{
-		res *= 0.393700787;
-		unit=librevenge::RVNG_INCH;
-	}
-	else if (unitIsMM)
-	{
-		res *= 0.0393700787;
-		unit=librevenge::RVNG_INCH;
-	}
-	return true;
+	//const char *first = str.cstr();
+	//const char *const last = first + str.size();
+
+	//using namespace boost::spirit::qi;
+	//using namespace librevenge;
+	//double ratio = 1;
+	//symbols<char, RVNGUnit> simpleUnit;
+	//simpleUnit.add("pt", RVNG_POINT)("in", RVNG_INCH)("*", RVNG_TWIP);
+	//if (phrase_parse(first, last,
+	//                 //  Begin grammar
+	//                 (
+	//                     double_ >> simpleUnit
+	//                     | double_ >> "%" >> attr(RVNG_PERCENT) >> attr(100.0)
+	//                     | double_ >> "cm" >> attr(RVNG_INCH) >> attr(2.54)
+	//                     | double_ >> "mm" >> attr(RVNG_INCH) >> attr(25.4)
+	//                     | double_ >> attr(RVNG_GENERIC)
+	//                 ),
+	//                 //  End grammar
+	//                 space,
+	//                 res, unit, ratio))
+	//{
+	//	res /= ratio;
+	//	return first == last;
+	//}
+
+	//return false;
 }
 
-bool findInt(const librevenge::RVNGString &str, int &res)
+bool findInt(const librevenge::RVNGString &/*str*/, int &/*res*/)
 {
-	using namespace ::boost::spirit::classic;
+	return false;
+	// TODO: section deleted because we wanted to not debend by boost
+	// if this portion is important, implement: phrase_parse(first, last, int_, space, res)
 
-	if (str.empty())
-		return false;
+	//if (str.empty())
+	//	return false;
 
-	return parse(str.cstr(),
-	             //  Begin grammar
-	             (
-	                 int_p[assign_a(res)]
-	             ) >> end_p,
-	             //  End grammar
-	             space_p).full;
+	//const char *first = str.cstr();
+	//const char *const last = first + str.size();
+	//using namespace boost::spirit::qi;
+	//return phrase_parse(first, last, int_, space, res) && first == last;
 }
 
-bool findBool(const librevenge::RVNGString &str, bool &res)
+bool findBool(const librevenge::RVNGString &/*str*/, bool &/*res*/)
 {
-	using namespace ::boost::spirit::classic;
+	return false;
+	//if (str.empty())
+	//	return false;
 
-	if (str.empty())
-		return false;
-
-	return parse(str.cstr(),
-	             //  Begin grammar
-	             (
-	                 str_p("true")[assign_a(res,true)]
-	                 |
-	                 str_p("false")[assign_a(res,false)]
-	                 |
-	                 str_p("TRUE")[assign_a(res,true)]
-	                 |
-	                 str_p("FALSE")[assign_a(res,false)]
-	             ) >> end_p,
-	             //  End grammar
-	             space_p).full;
+	//const char *first = str.cstr();
+	//const char *const last = first + str.size();
+	//using namespace boost::spirit::qi;
+	//return phrase_parse(first, last, no_case[bool_], space, res) && first == last;
 }
 
 } // anonymous namespace
@@ -124,10 +103,10 @@ namespace librevenge
 class RVNGPropertyListElement
 {
 public:
-	RVNGPropertyListElement() : m_prop(0), m_vec(0) {}
+	RVNGPropertyListElement() : m_prop(nullptr), m_vec(nullptr) {}
 	RVNGPropertyListElement(const RVNGPropertyListElement &elem)
-		: m_prop(elem.m_prop ? elem.m_prop->clone() : 0),
-		  m_vec(elem.m_vec ? static_cast<RVNGPropertyListVector *>(elem.m_vec->clone()) : 0) {}
+		: m_prop(elem.m_prop ? elem.m_prop->clone() : nullptr),
+		  m_vec(elem.m_vec ? static_cast<RVNGPropertyListVector *>(elem.m_vec->clone()) : nullptr) {}
 	/*
 	 * Caution, following constructor does not allocate memory but takes as
 	 * arguments pre-allocated memory that this class takes ownership of.
@@ -137,17 +116,15 @@ public:
 		: m_prop(prop), m_vec(vec) {}
 	~RVNGPropertyListElement()
 	{
-		delete m_prop;
-		delete m_vec;
 	}
 	RVNGPropertyListElement &operator=(const RVNGPropertyListElement &elem)
 	{
-		m_prop = elem.m_prop ? elem.m_prop->clone() : 0;
-		m_vec = elem.m_vec ? static_cast<RVNGPropertyListVector *>(elem.m_vec->clone()) : 0;
+		m_prop.reset(elem.m_prop ? elem.m_prop->clone() : nullptr);
+		m_vec.reset(elem.m_vec ? static_cast<RVNGPropertyListVector *>(elem.m_vec->clone()) : nullptr);
 		return *this;
 	}
-	RVNGProperty *m_prop;
-	RVNGPropertyListVector *m_vec;
+	std::unique_ptr<RVNGProperty> m_prop;
+	std::unique_ptr<RVNGPropertyListVector> m_vec;
 };
 
 class RVNGPropertyListImpl
@@ -176,56 +153,50 @@ RVNGPropertyListImpl &RVNGPropertyListImpl::operator=(const RVNGPropertyListImpl
 
 const RVNGProperty *RVNGPropertyListImpl::operator[](const char *name) const
 {
-	std::map<std::string, RVNGPropertyListElement>::iterator i = m_map.find(name);
+	auto i = m_map.find(name);
 	if (i != m_map.end())
-		return i->second.m_prop;
-	return 0;
+		return i->second.m_prop.get();
+	return nullptr;
 }
 
 const RVNGPropertyListVector *RVNGPropertyListImpl::child(const char *name) const
 {
-	std::map<std::string, RVNGPropertyListElement>::iterator i = m_map.find(name);
+	auto i = m_map.find(name);
 	if (i != m_map.end())
 	{
-		return i->second.m_vec;
+		return i->second.m_vec.get();
 	}
 
-	return 0;
+	return nullptr;
 }
 
 void RVNGPropertyListImpl::insert(const char *name, RVNGProperty *prop)
 {
-	std::map<std::string, RVNGPropertyListElement>::iterator i = m_map.lower_bound(name);
+	auto i = m_map.lower_bound(name);
 	if (i != m_map.end() && !(m_map.key_comp()(name, i->first)))
 	{
-		delete i->second.m_vec;
-		i->second.m_vec = 0;
-		RVNGProperty *tmpProp = i->second.m_prop;
-		i->second.m_prop = prop;
-		delete tmpProp;
+		i->second.m_vec = nullptr;
+		i->second.m_prop.reset(prop);
 		return;
 	}
-	m_map.insert(i, std::map<std::string, RVNGPropertyListElement>::value_type(name, RVNGPropertyListElement(prop, 0)));
+	m_map.insert(i, std::map<std::string, RVNGPropertyListElement>::value_type(name, RVNGPropertyListElement(prop, nullptr)));
 }
 
 void RVNGPropertyListImpl::insert(const char *name, RVNGPropertyListVector *vec)
 {
-	std::map<std::string, RVNGPropertyListElement>::iterator i = m_map.lower_bound(name);
+	auto i = m_map.lower_bound(name);
 	if (i != m_map.end() && !(m_map.key_comp()(name, i->first)))
 	{
-		delete i->second.m_prop;
-		i->second.m_prop = 0;
-		RVNGPropertyListVector *tmpProp = i->second.m_vec;
-		i->second.m_vec = vec;
-		delete tmpProp;
+		i->second.m_prop = nullptr;
+		i->second.m_vec.reset(vec);
 		return;
 	}
-	m_map.insert(i, std::map<std::string, RVNGPropertyListElement>::value_type(name, RVNGPropertyListElement(0, vec)));
+	m_map.insert(i, std::map<std::string, RVNGPropertyListElement>::value_type(name, RVNGPropertyListElement(nullptr, vec)));
 }
 
 void RVNGPropertyListImpl::remove(const char *name)
 {
-	std::map<std::string, RVNGPropertyListElement>::iterator i = m_map.find(name);
+	auto i = m_map.find(name);
 	if (i != m_map.end())
 	{
 		m_map.erase(i);
@@ -446,26 +417,23 @@ bool RVNGPropertyListIterImpl::next()
 
 bool RVNGPropertyListIterImpl::last()
 {
-	if (m_iter == m_map->end())
-		return true;
-
-	return false;
+	return m_iter == m_map->end();
 }
 
 const RVNGProperty *RVNGPropertyListIterImpl::operator()() const
 {
 	if (m_iter->second.m_prop)
-		return m_iter->second.m_prop;
+		return m_iter->second.m_prop.get();
 	if (m_iter->second.m_vec)
-		return m_iter->second.m_vec;
-	return 0;
+		return m_iter->second.m_vec.get();
+	return nullptr;
 }
 
 const RVNGPropertyListVector *RVNGPropertyListIterImpl::child() const
 {
 	if (m_iter->second.m_vec)
-		return m_iter->second.m_vec;
-	return 0;
+		return m_iter->second.m_vec.get();
+	return nullptr;
 }
 
 const char *RVNGPropertyListIterImpl::key() const

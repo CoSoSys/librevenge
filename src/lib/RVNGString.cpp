@@ -18,12 +18,15 @@
  * applicable instead of those above.
  */
 
-#include "librevenge_internal.h"
+#include "librevenge.h"
 
+#include <cassert>
 #include <cstring>
+#include <memory>
 #include <string>
 #include <stdarg.h>
-#include <stdio.h>
+#include <cstdio>
+#include <utility>
 
 #define FIRST_BUF_SIZE 128
 #ifdef _MSC_VER
@@ -84,50 +87,46 @@ public:
 	{
 		return (unsigned long)m_buf.size();
 	}
-	void appendEscapedXML(const char *s, const unsigned long sz);
+	void append(const char *s);
+	void append(char c);
 	std::string m_buf;
 };
 
-void RVNGStringImpl::appendEscapedXML(const char *s, const unsigned long sz)
+void RVNGStringImpl::append(const char *s)
 {
-	m_buf.reserve(m_buf.size() + 2 * sz);
-	const char *p = s;
-	const char *const end = p + sz;
-	while (p != end)
-	{
-		const char *const next = librvng_utf8_next_char(p);
-		if (next > end)
-		{
-			RVNG_DEBUG_MSG(("RVNGStringImpl::appendEscapedXML: oops, we have a problem\n"));
-			break;
-		}
-		switch (*p)
-		{
-		case '&':
-			m_buf.append("&amp;");
-			break;
-		case '<':
-			m_buf.append("&lt;");
-			break;
-		case '>':
-			m_buf.append("&gt;");
-			break;
-		case '\'':
-			m_buf.append("&apos;");
-			break;
-		case '"':
-			m_buf.append("&quot;");
-			break;
-		default:
-			while (p != next)
-			{
-				m_buf.append(1, *p);
-				++p;
-			}
-			break;
-		}
+	assert(s);
 
-		p = next;
+	// Find the true end of the string (one past the last code unit of
+	// the last complete UTF-8 character)
+	const char *v = s;
+	const char *p = s;
+	const char *u = s;
+	while (*p)
+	{
+		u = librvng_utf8_next_char(u);
+		while (p < u && *p) ++p;
+		if (p == u)
+			v = u;
+	}
+
+	if (*v)
+	{
+		RVNG_DEBUG_MSG(("RVNGStringImpl::append: the string is not a valid UTF-8 string\n"));
+	}
+
+	if (v > s)
+		m_buf.append(s, v - s);
+}
+
+void RVNGStringImpl::append(char c)
+{
+	if (librvng_utf8_skip_data[static_cast<unsigned char>(c)] == 1)
+	{
+		m_buf.append(1, c);
+	}
+	else
+	{
+		RVNG_DEBUG_MSG(("RVNGStringImpl::append: '%c' is not a valid 1-byte UTF-8 char\n", c));
 	}
 }
 
@@ -152,21 +151,7 @@ RVNGString::RVNGString(const char *str) :
 	m_stringImpl(new RVNGStringImpl)
 {
 	if (str)
-		m_stringImpl->m_buf = str;
-}
-
-RVNGString RVNGString::escapeXML(const RVNGString &s)
-{
-	RVNGString escaped;
-	escaped.appendEscapedXML(s);
-	return escaped;
-}
-
-RVNGString RVNGString::escapeXML(const char *const s)
-{
-	RVNGString escaped;
-	escaped.appendEscapedXML(s);
-	return escaped;
+		m_stringImpl->append(str);
 }
 
 const char *RVNGString::cstr() const
@@ -180,6 +165,7 @@ void RVNGString::sprintf(const char *format, ...)
 
 	int bufsize = FIRST_BUF_SIZE;
 	char firstBuffer[FIRST_BUF_SIZE];
+	std::unique_ptr<char[]> workBuffer;
 	char *buf = firstBuffer;
 
 	while (true)
@@ -195,15 +181,12 @@ void RVNGString::sprintf(const char *format, ...)
 		else
 			break;
 
-		if (buf != firstBuffer)
-			delete [] buf;
-		buf = new char[bufsize];
+		workBuffer.reset(new char[bufsize]);
+		buf = workBuffer.get();
 	}
 
 	clear();
 	append(buf);
-	if (buf != firstBuffer)
-		delete [] buf;
 }
 
 void RVNGString::append(const RVNGString &s)
@@ -214,22 +197,12 @@ void RVNGString::append(const RVNGString &s)
 void RVNGString::append(const char *s)
 {
 	if (s)
-		m_stringImpl->m_buf.append(s);
+		m_stringImpl->append(s);
 }
 
 void RVNGString::append(const char c)
 {
 	m_stringImpl->m_buf.append(1, c);
-}
-
-void RVNGString::appendEscapedXML(const RVNGString &s)
-{
-	m_stringImpl->appendEscapedXML(s.cstr(), s.size());
-}
-
-void RVNGString::appendEscapedXML(const char *const s)
-{
-	m_stringImpl->appendEscapedXML(s, std::strlen(s));
 }
 
 void RVNGString::clear()
@@ -260,10 +233,9 @@ RVNGString &RVNGString::operator=(const RVNGString &stringBuf)
 
 RVNGString &RVNGString::operator=(const char *s)
 {
+	clear();
 	if (s)
-		m_stringImpl->m_buf = s;
-	else
-		clear();
+		m_stringImpl->append(s);
 	return *this;
 }
 
@@ -294,7 +266,7 @@ bool RVNGString::operator<(const RVNGString &str) const
 RVNGString::Iter::Iter(const RVNGString &str) :
 	m_stringImpl(new RVNGStringImpl),
 	m_pos(0),
-	m_curChar(0)
+	m_curChar(nullptr)
 {
 	m_stringImpl->m_buf = str.cstr();
 }
@@ -312,7 +284,7 @@ void RVNGString::Iter::rewind()
 
 bool RVNGString::Iter::next()
 {
-	int len = (int) m_stringImpl->m_buf.length();
+	auto len = (int) m_stringImpl->m_buf.length();
 
 	if (m_pos == (-1))
 		m_pos++;
@@ -329,23 +301,32 @@ bool RVNGString::Iter::next()
 
 bool RVNGString::Iter::last()
 {
-	if (m_pos >= m_stringImpl->len())
-		return true;
-	return false;
+	assert(m_pos >= -1);
+	if (m_pos == -1)
+		return false;
+	return unsigned(m_pos) >= m_stringImpl->m_buf.length();
 }
 
 const char *RVNGString::Iter::operator()() const
 {
-	if (m_pos == (-1)) return 0;
+	if (m_pos == (-1)) return nullptr;
 
-	if (m_curChar) delete [] m_curChar;
-	m_curChar = 0;
-	int charLength =(int)(librvng_utf8_next_char(&(m_stringImpl->m_buf.c_str()[m_pos])) -
-	                      &(m_stringImpl->m_buf.c_str()[m_pos]));
-	m_curChar = new char[charLength+1];
+	auto charLength =(int)(librvng_utf8_next_char(&(m_stringImpl->m_buf.c_str()[m_pos])) -
+	                       &(m_stringImpl->m_buf.c_str()[m_pos]));
+	const int curCharLength = m_curChar ? int(unsigned(std::strlen(m_curChar))) : 0;
+	if (curCharLength < charLength)
+	{
+		auto *newChar = new char[charLength+1];
+		std::swap(m_curChar, newChar);
+		delete[] newChar;
+	}
 	for (int i=0; i<charLength; i++)
 		m_curChar[i] = m_stringImpl->m_buf[size_t(m_pos+i)];
-	m_curChar[charLength]='\0';
+
+	if (m_curChar) { // m_curChar != nullptr <=> curCharLength != 0
+		m_curChar[charLength]='\0';
+	}
+
 
 	return m_curChar;
 }

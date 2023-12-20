@@ -17,29 +17,36 @@
  * applicable instead of those above.
  */
 
-#ifndef RVNGZIPSTREAM_H
-#define RVNGZIPSTREAM_H
+#ifndef RVNGSTRINGVECTOR_H
+#define RVNGSTRINGVECTOR_H
 
-#ifdef LIBVISIO_ENABLE_UNUSED
-#include <string>
-#include <vector>
+#include "RVNGString.h"
 
 namespace librevenge
 {
 
-class RVNGInputStream;
+class RVNGStringVectorImpl;
 
-class RVNGZipStream
+class RVNGStringVector
 {
 public:
-	static bool isZipFile(RVNGInputStream *input);
+	RVNGStringVector();
+	RVNGStringVector(const RVNGStringVector &vec);
+	~RVNGStringVector();
 
-	static std::vector<std::string> getSubStreamNamesList(RVNGInputStream *input);
-	static RVNGInputStream *getSubstream(RVNGInputStream *input, const char *name);
+	RVNGStringVector &operator=(const RVNGStringVector &vec);
+
+	unsigned size() const;
+	bool empty() const;
+	const RVNGString &operator[](unsigned idx) const;
+	void append(const RVNGString &str);
+	void clear();
+
+private:
+	RVNGStringVectorImpl *m_pImpl;
 };
 
 }
 
-#endif // LIBVISIO_ENABLE_UNUSED
-#endif // RVNGZIPSTREAM_H
+#endif /* RVNGSTRINGVECTOR_H */
 /* vim:set shiftwidth=4 softtabstop=4 noexpandtab: */

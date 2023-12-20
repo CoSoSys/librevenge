@@ -12,10 +12,8 @@
  * applicable instead of those above.
  */
 
+#include "RVNGTextDrawingGenerator.h"
 #include <sstream>
-
-#include <librevenge/librevenge.h>
-#include <librevenge-generators/librevenge-generators.h>
 
 namespace librevenge
 {
@@ -48,7 +46,7 @@ void RVNGTextDrawingGenerator::startDocument(const RVNGPropertyList & /*propList
 void RVNGTextDrawingGenerator::endDocument() {}
 void RVNGTextDrawingGenerator::setDocumentMetaData(const RVNGPropertyList & /*propList*/) {}
 void RVNGTextDrawingGenerator::defineEmbeddedFont(const RVNGPropertyList & /*propList*/) {}
-void RVNGTextDrawingGenerator::startPage(const RVNGPropertyList &) {}
+void RVNGTextDrawingGenerator::startPage(const RVNGPropertyList& /*pageProps*/) { }
 
 void RVNGTextDrawingGenerator::endPage()
 {
@@ -108,15 +106,15 @@ void RVNGTextDrawingGenerator::closeSpan() {}
 void RVNGTextDrawingGenerator::openLink(const RVNGPropertyList & /* propList */) {}
 void RVNGTextDrawingGenerator::closeLink() {}
 
-void RVNGTextDrawingGenerator::insertTab() {}
-void RVNGTextDrawingGenerator::insertSpace() {}
+void RVNGTextDrawingGenerator::insertTab() { m_impl->m_stream << "\t"; }
+void RVNGTextDrawingGenerator::insertSpace() { m_impl->m_stream << " "; }
 
 void RVNGTextDrawingGenerator::insertText(const RVNGString &str)
 {
 	m_impl->m_stream << str.cstr();
 }
 
-void RVNGTextDrawingGenerator::insertLineBreak() {}
+void RVNGTextDrawingGenerator::insertLineBreak() { m_impl->m_stream << "\n"; }
 void RVNGTextDrawingGenerator::insertField(const RVNGPropertyList & /*propList*/) {}
 
 void RVNGTextDrawingGenerator::startTableObject(const RVNGPropertyList &) {}

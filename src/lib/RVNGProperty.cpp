@@ -18,13 +18,13 @@
  * applicable instead of those above.
  */
 
+#include "librevenge.h"
+
 #include <ctype.h>
 #include <locale.h>
 
 #include <sstream>
 #include <string>
-
-#include <librevenge/librevenge.h>
 
 namespace librevenge
 {

@@ -32,6 +32,8 @@
 #ifndef RVNGOLESTREAM_H
 #define RVNGOLESTREAM_H
 
+#ifdef LIBVISIO_ENABLE_UNUSED
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -79,7 +81,7 @@ public:
 	Result result();
 
 private:
-	IStorage *m_io;
+	std::unique_ptr<IStorage> m_io;
 
 	// no copy or assign
 	Storage(const Storage &);
@@ -115,7 +117,7 @@ public:
 	unsigned long read(unsigned char *data, unsigned long maxlen);
 
 private:
-	IStream *m_io;
+	std::unique_ptr<IStream> m_io;
 
 	// no copy or assign
 	Stream(const Stream &);
@@ -123,6 +125,6 @@ private:
 };
 
 }  // namespace librevenge
-
+#endif // LIBVISIO_ENABLE_UNUSED
 #endif // RVNGOLESTREAM_H
 /* vim:set shiftwidth=4 softtabstop=4 noexpandtab: */

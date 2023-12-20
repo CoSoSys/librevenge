@@ -40,7 +40,7 @@ const unsigned char *RVNGMemoryInputStream::read(unsigned long numBytes, unsigne
 	numBytesRead = 0;
 
 	if (numBytes == 0)
-		return 0;
+		return nullptr;
 
 	long numBytesToRead;
 
@@ -52,7 +52,7 @@ const unsigned char *RVNGMemoryInputStream::read(unsigned long numBytes, unsigne
 	numBytesRead = (unsigned long) numBytesToRead; // about as paranoid as we can be..
 
 	if (numBytesToRead == 0)
-		return 0;
+		return nullptr;
 
 	long oldOffset = m_offset;
 	m_offset += numBytesToRead;

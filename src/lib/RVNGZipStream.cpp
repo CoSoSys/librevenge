@@ -17,15 +17,22 @@
  * applicable instead of those above.
  */
 
+#include "RVNGZipStream.h"
+#ifdef LIBVISIO_ENABLE_UNUSED
+
+#include "RVNGDirectoryStream.h"
+#include "RVNGStream.h"
+#include "RVNGStreamImplementation.h"
+
+#include <algorithm>
 #include <cassert>
 #include <string>
-#include <string.h>
-#include <stdio.h>
+#include <cstring>
+#include <cstdio>
 #include <utility>
 
 #include <zlib.h>
-#include "RVNGZipStream.h"
-#include <librevenge-stream/librevenge-stream.h>
+
 
 namespace librevenge
 {
@@ -427,13 +434,13 @@ RVNGInputStream *RVNGZipStream::getSubstream(RVNGInputStream *input, const char 
 {
 	CentralDirectoryEntry entry;
 	if (!findDataStream(input, entry, name))
-		return 0;
+		return nullptr;
 	if (!entry.compressed_size)
-		return 0;
+		return nullptr;
 	unsigned long numBytesRead = 0;
-	unsigned char *compressedData = const_cast<unsigned char *>(input->read(entry.compressed_size, numBytesRead));
+	auto *compressedData = const_cast<unsigned char *>(input->read(entry.compressed_size, numBytesRead));
 	if (numBytesRead != entry.compressed_size)
-		return 0;
+		return nullptr;
 	if (!entry.compression)
 		return new RVNGStringStream(compressedData, (unsigned)numBytesRead);
 	else
@@ -449,7 +456,7 @@ RVNGInputStream *RVNGZipStream::getSubstream(RVNGInputStream *input, const char 
 		strm.next_in = Z_NULL;
 		ret = inflateInit2(&strm,-MAX_WBITS);
 		if (ret != Z_OK)
-			return 0;
+			return nullptr;
 
 		const unsigned long blockSize = (std::max)(4096ul, 2 * numBytesRead);
 
@@ -457,12 +464,12 @@ RVNGInputStream *RVNGZipStream::getSubstream(RVNGInputStream *input, const char 
 
 		strm.avail_in = (unsigned)numBytesRead;
 		strm.next_in = (Bytef *)compressedData;
-		strm.next_out = &data[0];
+		strm.next_out = data.data();
 
 		bool done = false;
 		while (!done)
 		{
-			const std::ptrdiff_t nextOutIndex = strm.next_out - &data[0];
+			const std::ptrdiff_t nextOutIndex = strm.next_out - data.data();
 			assert(nextOutIndex >= 0);
 			data.resize(data.size() + blockSize);
 			assert(data.size() > std::size_t(nextOutIndex));
@@ -477,8 +484,8 @@ RVNGInputStream *RVNGZipStream::getSubstream(RVNGInputStream *input, const char 
 				break;
 			// TODO: return partial result on Z_BUF_ERROR/Z_DATA_ERROR?
 			default:
-				data.clear();
-			// fall-through intended
+				strm.total_out = 0; // abandon partial result
+			/* FALLTHRU */
 			case Z_STREAM_END:
 				done = true;
 				break;
@@ -488,11 +495,12 @@ RVNGInputStream *RVNGZipStream::getSubstream(RVNGInputStream *input, const char 
 		(void)inflateEnd(&strm);
 
 		if (strm.total_out == 0)
-			return 0;
-		return new RVNGStringStream(&data[0], (unsigned int) strm.total_out);
+			return nullptr;
+		return new RVNGStringStream(data.data(), (unsigned int) strm.total_out);
 	}
 }
 
 }
 
+#endif // LIBVISIO_ENABLE_UNUSED
 /* vim:set shiftwidth=4 softtabstop=4 noexpandtab: */

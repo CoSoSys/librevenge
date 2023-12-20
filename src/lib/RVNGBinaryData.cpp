@@ -17,21 +17,18 @@
  * applicable instead of those above.
  */
 
-#include <boost/algorithm/string.hpp>
-#include <boost/archive/iterators/binary_from_base64.hpp>
-#include <boost/archive/iterators/base64_from_binary.hpp>
-#include <boost/archive/iterators/remove_whitespace.hpp>
-#include <boost/archive/iterators/transform_width.hpp>
-#include <boost/range/iterator_range.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/shared_ptr.hpp>
+#include "librevenge.h"
 
+
+
+#include <algorithm>
+#include <iterator>
+#include <memory>
 #include <vector>
 #include <string>
 #include <stdarg.h>
-#include <stdio.h>
+#include <cstdio>
 
-#include <librevenge/librevenge.h>
 #include "RVNGMemoryStream.h"
 
 
@@ -46,32 +43,26 @@ struct DataImpl
 	DataImpl() : m_buf(), m_stream() {}
 
 	std::vector<unsigned char> m_buf;
-	boost::scoped_ptr<RVNGMemoryInputStream> m_stream;
+	std::unique_ptr<RVNGMemoryInputStream> m_stream;
 };
 
-void convertFromBase64(std::vector<unsigned char> &result, const std::string &source)
+void convertToBase64(std::string &result, const std::vector<unsigned char> & /*source*/)
 {
-	std::string::const_iterator paddingIter = std::find(source.begin(), source.end(), '=');
-	typedef boost::archive::iterators::transform_width<
-	boost::archive::iterators::binary_from_base64<
-	boost::archive::iterators::remove_whitespace< std::string::const_iterator > >, 8, 6 > base64_decoder;
+	result.clear();
 
-	std::copy(base64_decoder(source.begin()), base64_decoder(paddingIter), std::back_inserter(result));
-}
+	// TODO: this might be used ==> reimplement (Dani)
 
-void convertToBase64(std::string &result, const std::vector<unsigned char> &source)
-{
-	unsigned numPadding = unsigned((3- (source.size()%3)) %3);
+	//auto numPadding = unsigned((3- (source.size()%3)) %3);
 
-	typedef boost::archive::iterators::base64_from_binary<
-	boost::archive::iterators::transform_width<std::vector<unsigned char>::const_iterator, 6, 8 > > base64_encoder;
+	//typedef boost::archive::iterators::base64_from_binary<
+	//boost::archive::iterators::transform_width<std::vector<unsigned char>::const_iterator, 6, 8 > > base64_encoder;
 
-	// Encode the buffer and create a string
-	std::copy(
-	    base64_encoder(source.begin()),
-	    base64_encoder(source.end()), std::back_inserter(result));
+	//// Encode the buffer and create a string
+	//std::copy(
+	//    base64_encoder(source.begin()),
+	//    base64_encoder(source.end()), std::back_inserter(result));
 
-	result.append(numPadding, '=');  // add '=' for each padded character
+	//result.append(numPadding, '=');  // add '=' for each padded character
 }
 
 } // anonymous namespace
@@ -82,7 +73,7 @@ struct RVNGBinaryDataImpl
 
 	void makeUnique();
 
-	boost::shared_ptr<DataImpl> m_ptr;
+	std::shared_ptr<DataImpl> m_ptr;
 };
 
 RVNGBinaryDataImpl::RVNGBinaryDataImpl()
@@ -94,7 +85,7 @@ void RVNGBinaryDataImpl::makeUnique()
 {
 	if (!m_ptr.unique())
 	{
-		boost::shared_ptr<DataImpl> ptr(new DataImpl());
+		std::shared_ptr<DataImpl> ptr(new DataImpl());
 		ptr->m_buf = m_ptr->m_buf;
 		m_ptr = ptr;
 	}
@@ -117,66 +108,49 @@ RVNGBinaryData::RVNGBinaryData(const RVNGBinaryData &data) :
 }
 
 RVNGBinaryData::RVNGBinaryData(const unsigned char *buffer, const unsigned long bufferSize) :
-	m_binaryDataImpl(new RVNGBinaryDataImpl)
+	m_binaryDataImpl(nullptr)
 {
+	std::unique_ptr<RVNGBinaryDataImpl> impl(new RVNGBinaryDataImpl());
 	if (buffer)
-	{
-		m_binaryDataImpl->m_ptr->m_buf = std::vector<unsigned char> (bufferSize);
-		for (unsigned long i = 0; i < bufferSize; i++)
-			m_binaryDataImpl->m_ptr->m_buf[i] = buffer[i];
-	}
+		impl->m_ptr->m_buf.assign(buffer, buffer + bufferSize);
+	m_binaryDataImpl = impl.release();
 }
 
-RVNGBinaryData::RVNGBinaryData(const RVNGString &base64) :
-	m_binaryDataImpl(new RVNGBinaryDataImpl)
+RVNGBinaryData::RVNGBinaryData(const RVNGString &/*base64*/) :
+	m_binaryDataImpl(nullptr)
 {
+	// TODO: this function might be used ==> reimplement trim (Dani)
+
+	/*std::unique_ptr<RVNGBinaryDataImpl> impl(new RVNGBinaryDataImpl());
 	std::string base64String(base64.cstr(), base64.size());
 	boost::trim(base64String);
-	convertFromBase64(m_binaryDataImpl->m_ptr->m_buf, base64String);
+	convertFromBase64(impl->m_ptr->m_buf, base64String);
+	m_binaryDataImpl = impl.release();*/
 }
 
-RVNGBinaryData::RVNGBinaryData(const char *base64) :
-	m_binaryDataImpl(new RVNGBinaryDataImpl)
+RVNGBinaryData::RVNGBinaryData(const char * /*base64*/) :
+	m_binaryDataImpl(nullptr)
 {
-	if (base64)
+	std::unique_ptr<RVNGBinaryDataImpl> impl(new RVNGBinaryDataImpl());
+
+	// TODO: this portion might be used ==> reimplement trim (Dani)
+	/*if (base64)
 	{
 		std::string base64String(base64);
 		boost::trim(base64String);
-		convertFromBase64(m_binaryDataImpl->m_ptr->m_buf, base64String);
-	}
+		convertFromBase64(impl->m_ptr->m_buf, base64String);
+	}*/
+	m_binaryDataImpl = impl.release();
 }
 
 void RVNGBinaryData::append(const RVNGBinaryData &data)
 {
 	m_binaryDataImpl->makeUnique();
 
-	unsigned long previousSize = m_binaryDataImpl->m_ptr->m_buf.size();
+	unsigned long previousSize = (unsigned long) m_binaryDataImpl->m_ptr->m_buf.size();
 	m_binaryDataImpl->m_ptr->m_buf.reserve(previousSize + data.m_binaryDataImpl->m_ptr->m_buf.size());
-	for (unsigned long i = 0; i < data.m_binaryDataImpl->m_ptr->m_buf.size(); i++)
-		m_binaryDataImpl->m_ptr->m_buf.push_back(data.m_binaryDataImpl->m_ptr->m_buf[i]);
-}
-
-void RVNGBinaryData::appendBase64Data(const RVNGString &base64)
-{
-	std::string base64String(base64.cstr(), base64.size());
-	boost::trim(base64String);
-	std::vector<unsigned char> buffer;
-	convertFromBase64(buffer, base64String);
-	if (!buffer.empty())
-		append(&buffer[0], buffer.size());
-}
-
-void RVNGBinaryData::appendBase64Data(const char *base64)
-{
-	if (base64)
-	{
-		std::string base64String(base64);
-		boost::trim(base64String);
-		std::vector<unsigned char> buffer;
-		convertFromBase64(buffer, base64String);
-		if (!buffer.empty())
-			append(&buffer[0], buffer.size());
-	}
+	const auto &src = data.m_binaryDataImpl->m_ptr->m_buf;
+	std::copy(src.begin(), src.end(), std::back_inserter(m_binaryDataImpl->m_ptr->m_buf));
 }
 
 void RVNGBinaryData::append(const unsigned char *buffer, const unsigned long bufferSize)
@@ -224,8 +198,8 @@ RVNGBinaryData &RVNGBinaryData::operator=(const RVNGBinaryData &dataBuf)
 const unsigned char *RVNGBinaryData::getDataBuffer() const
 {
 	if (m_binaryDataImpl->m_ptr->m_buf.empty())
-		return 0;
-	return &(m_binaryDataImpl->m_ptr->m_buf[0]);
+		return nullptr;
+	return m_binaryDataImpl->m_ptr->m_buf.data();
 }
 
 const RVNGString RVNGBinaryData::getBase64Data() const
@@ -237,14 +211,14 @@ const RVNGString RVNGBinaryData::getBase64Data() const
 
 RVNGInputStream *RVNGBinaryData::getDataStream() const
 {
-	boost::shared_ptr<DataImpl> data = m_binaryDataImpl->m_ptr;
+	std::shared_ptr<DataImpl> data = m_binaryDataImpl->m_ptr;
 	if (data->m_stream)
 	{
 		data->m_stream.reset();
 	}
 	if (data->m_buf.empty())
-		return 0;
-	data->m_stream.reset(new RVNGMemoryInputStream(&(data->m_buf[0]), data->m_buf.size()));
+		return nullptr;
+	data->m_stream.reset(new RVNGMemoryInputStream(data->m_buf.data(), (unsigned long) data->m_buf.size()));
 	return data->m_stream.get();
 }
 

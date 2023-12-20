@@ -29,3 +29,5 @@ test-driver
 *.rc
 *~
 *.tar.*
+.DS_Store
+

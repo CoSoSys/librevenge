@@ -19,7 +19,7 @@
  * applicable instead of those above.
  */
 
-#include <librevenge/librevenge.h>
+#include "librevenge.h"
 #include <vector>
 
 namespace librevenge
@@ -102,8 +102,7 @@ RVNGPropertyListVector::RVNGPropertyListVector() :
 
 RVNGPropertyListVector::~RVNGPropertyListVector()
 {
-	if (m_impl)
-		delete m_impl;
+	delete m_impl;
 }
 
 int RVNGPropertyListVector::getInt() const

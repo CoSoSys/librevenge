@@ -41,7 +41,9 @@
  This file taken from libwpg RVNGOLEStream.cpp 1.5 Thu Aug 17 21:21:30 2006
 */
 
-#include <string.h>
+#include "RVNGOLEStream.h"
+#ifdef LIBVISIO_ENABLE_UNUSED
+#include <cstring>
 #include <ctype.h>
 
 #include <cassert>
@@ -53,11 +55,11 @@
 #include <string>
 #include <vector>
 
-#include <librevenge-stream/librevenge-stream.h>
+#include "RVNGDirectoryStream.h"
+#include "RVNGStream.h"
+#include "RVNGStreamImplementation.h"
 
-#include "librevenge_internal.h"
-
-#include "RVNGOLEStream.h"
+#include "librevenge.h"
 
 namespace librevenge
 {
@@ -180,7 +182,7 @@ public:
 	void load(const unsigned char *buffer, unsigned len)
 	{
 		resize(len / 4);
-		for (unsigned i = 0; i < count(); i++)
+		for (unsigned long i = 0; i < count(); i++)
 			set(i, readU32(buffer + i*4));
 	}
 
@@ -188,7 +190,7 @@ public:
 	void setChain(std::vector<unsigned long> chain, unsigned end);
 	void save(unsigned char *buffer) const
 	{
-		unsigned cnt=(unsigned) count();
+		auto cnt=(unsigned) count();
 		unsigned i = 0;
 		for (i = 0; i < cnt; i++)
 			writeU32(buffer + i*4, m_data[i]);
@@ -200,7 +202,7 @@ public:
 	// return space required to save the allocation table
 	unsigned saveSize() const
 	{
-		unsigned cnt=(unsigned)(((count()+127)/128)*128);
+		auto cnt=(unsigned)(((count()+127)/128)*128);
 		return cnt * 4;
 	}
 private:
@@ -224,8 +226,8 @@ public:
 	//! returns true if the clsid field is filed
 	bool hasCLSId() const
 	{
-		for (int i=0; i < 4; i++)
-			if (m_clsid[i]) return true;
+		for (unsigned int i : m_clsid)
+			if (i) return true;
 		return false;
 	}
 	/** four uint32_t : the first two used for creation, the last for modification time */
@@ -317,13 +319,13 @@ public:
 	/** returns the entry with a given index */
 	DirEntry const *entry(unsigned ind) const
 	{
-		if (ind >= count()) return 0;
+		if (ind >= count()) return nullptr;
 		return &m_entries[ size_t(ind) ];
 	}
 	/** returns the entry with a given index */
 	DirEntry *entry(unsigned ind)
 	{
-		if (ind >= count()) return  0;
+		if (ind >= count()) return  nullptr;
 		return &m_entries[ size_t(ind) ];
 	}
 	/** returns the entry with a given name */
@@ -339,12 +341,12 @@ public:
 		DirEntry const *p = entry(ind);
 		if (!p || !p->m_valid) return 0;
 		std::vector<unsigned> siblingsList = get_siblings(p->m_child);
-		for (size_t s=0; s < siblingsList.size(); s++)
+		for (unsigned s : siblingsList)
 		{
-			p  = entry(siblingsList[s]);
+			p  = entry(s);
 			if (!p) continue;
 			if (p->name()==name)
-				return siblingsList[s];
+				return s;
 		}
 		return 0;
 	}
@@ -392,9 +394,8 @@ protected:
 		std::set<unsigned> seens;
 		get_siblings(ind, seens);
 		std::vector<unsigned> retVal;
-		for (std::set<unsigned>::const_iterator iter = seens.begin();
-		        iter != seens.end(); ++iter)
-			retVal.push_back(*iter);
+		for (unsigned seen : seens)
+			retVal.push_back(seen);
 		return retVal;
 	}
 	//! constructs the list of siblings ( by filling the seens set )
@@ -489,7 +490,7 @@ public:
 	//! returns a directory entry corresponding to a name
 	DirEntry *entry(const std::string &name)
 	{
-		if (!name.length()) return 0;
+		if (!name.length()) return nullptr;
 		load();
 		return m_dirtree.entry(name);
 	}
@@ -581,7 +582,7 @@ public:
 		DirEntry *e = m_dirtree.entry(name);
 		if (!e)
 		{
-			RVNG_DEBUG_MSG(("librevengeOLE::OStorage::setInformation: can not find entry %s!!!\n", name.c_str()));
+			// printf(("librevengeOLE::OStorage::setInformation: can not find entry %s!!!\n", name.c_str()));
 			return;
 		}
 		e->m_info = info;
@@ -620,7 +621,7 @@ protected:
 	size_t getDataAddress(unsigned block, bool isBig) const
 	{
 		if (isBig) return size_t((block+1)*512);
-		size_t bId=size_t(block/8);
+		auto bId=size_t(block/8);
 		if (bId >= m_sb_blocks.size()) throw GenericException();
 		return size_t((m_sb_blocks[bId]+1)*512+64*(block%8));
 	}
@@ -648,16 +649,16 @@ protected:
 	{
 		if (name.length()==0)
 		{
-			RVNG_DEBUG_MSG(("librevengeOLE::OStorage::createEntry: called with no name\n"));
-			return 0;
+			// printf(("librevengeOLE::OStorage::createEntry: called with no name\n"));
+			return nullptr;
 		}
 		if (m_dirtree.index(name)!=NotFound)
 		{
-			RVNG_DEBUG_MSG(("librevengeOLE::OStorage::createEntry: entry %s already exists\n", name.c_str()));
-			return 0;
+			// printf(("librevengeOLE::OStorage::createEntry: entry %s already exists\n", name.c_str()));
+			return nullptr;
 		}
 		unsigned index = m_dirtree.index(name,true);
-		if (index == NotFound) return 0;
+		if (index == NotFound) return nullptr;
 
 		return m_dirtree.entry(index);
 	}
@@ -747,8 +748,8 @@ librevenge::Header::Header() :
 {
 	for (unsigned i = 0; i < 8; i++)
 		m_magic[i] = s_ole_magic[i];
-	for (unsigned j=0; j<109; j++)
-		m_blocks_bbat[j] = Avail;
+	for (unsigned long &j : m_blocks_bbat)
+		j = Avail;
 	compute_block_size();
 }
 
@@ -774,7 +775,11 @@ void librevenge::Header::load(const unsigned char *buffer, unsigned long size)
 		return;
 	m_revision = (unsigned) readU16(buffer+0x18);
 	m_shift_bbat      = (unsigned int) readU16(buffer + 0x1e);
+	if (m_shift_bbat > 31)
+		m_shift_bbat = 31;
 	m_shift_sbat      = (unsigned int) readU16(buffer + 0x20);
+	if (m_shift_sbat > 31)
+		m_shift_sbat = 31;
 	m_num_bat      = (unsigned int) readU32(buffer + 0x2c);
 	m_start_dirent = (unsigned int) readU32(buffer + 0x30);
 	m_threshold    = (unsigned int) readU32(buffer + 0x38);
@@ -839,7 +844,7 @@ void librevenge::AllocTable::setChain(std::vector<unsigned long> chain, unsigned
 {
 	if (!chain.size()) return;
 
-	for (unsigned i=0; i<chain.size()-1; i++)
+	for (size_t i=0; i<chain.size()-1; i++)
 		set(chain[i], chain[i+1]);
 	set(chain[ chain.size()-1 ], end);
 }
@@ -849,7 +854,7 @@ void librevenge::DirEntry::load(unsigned char *buffer, unsigned len)
 {
 	if (len != 128)
 	{
-		RVNG_DEBUG_MSG(("DirEntry::load: unexpected len for DirEntry::load\n"));
+		// printf(("DirEntry::load: unexpected len for DirEntry::load\n"));
 		*this=DirEntry();
 		return;
 	}
@@ -859,7 +864,7 @@ void librevenge::DirEntry::load(unsigned char *buffer, unsigned len)
 
 	// parse name of this entry, which stored as Unicode 16-bit
 	m_name=std::string("");
-	unsigned name_len = (unsigned) readU16(buffer + 0x40);
+	auto name_len = (unsigned) readU16(buffer + 0x40);
 	if (name_len > 64) name_len = 64;
 	if (name_len==2 && m_type==5 && readU16(buffer)==0x5200)
 	{
@@ -896,7 +901,7 @@ void librevenge::DirEntry::save(unsigned char *buffer) const
 	int i = 0;
 	for (i = 0; i < 128; i++) buffer[i]=0;
 
-	unsigned name_len = (unsigned) m_name.length();
+	auto name_len = (unsigned) m_name.length();
 	if (name_len>31) name_len = 31;
 	if (name_len==2 && m_macRootEntry && m_type==5)
 		buffer[1]='R';
@@ -1054,8 +1059,8 @@ void librevenge::DirTree::getSubStreamList(unsigned ind, bool all, const std::st
 	if (p->m_child >= cnt)
 		return;
 	std::vector<unsigned> siblings=get_siblings(p->m_child);
-	for (size_t s=0; s < siblings.size(); s++)
-		getSubStreamList(siblings[s], all, name, res, seen);
+	for (unsigned sibling : siblings)
+		getSubStreamList(sibling, all, name, res, seen);
 }
 
 void librevenge::DirTree::setInRedBlackTreeForm(unsigned ind, std::set<unsigned> &seen)
@@ -1078,12 +1083,11 @@ void librevenge::DirTree::setInRedBlackTreeForm(unsigned ind, std::set<unsigned>
 	CompareEntryName compare(*this);
 	std::set<unsigned,CompareEntryName> set(childs.begin(),childs.end(),compare);
 	std::vector<unsigned> sortedChildren;
-	for (std::set<unsigned,CompareEntryName>::const_iterator iter = set.begin();
-	        iter != set.end(); ++iter)
-		sortedChildren.push_back(*iter);
+	for (unsigned iter : set)
+		sortedChildren.push_back(iter);
 	if (sortedChildren.size() != numChild)
 	{
-		RVNG_DEBUG_MSG(("DirTree::setInRedBlackTreeForm: OOPS pb with numChild\n"));
+		// printf(("DirTree::setInRedBlackTreeForm: OOPS pb with numChild\n"));
 		return;
 	}
 	unsigned h=1;
@@ -1105,7 +1109,7 @@ unsigned librevenge::DirTree::setInRBTForm(std::vector<unsigned> const &childs,
 	DirEntry *p = entry(ind);
 	if (!p)
 	{
-		RVNG_DEBUG_MSG(("DirTree::setInRedBlackTreeForm: OOPS can not find tree to modified\n"));
+		// printf(("DirTree::setInRedBlackTreeForm: OOPS can not find tree to modified\n"));
 		throw GenericException();
 	}
 	unsigned newH = height==0 ? 0 : height-1;
@@ -1114,7 +1118,7 @@ unsigned librevenge::DirTree::setInRBTForm(std::vector<unsigned> const &childs,
 		p->m_colour = 0;
 		if (firstInd!=middle || lastInd!=middle)
 		{
-			RVNG_DEBUG_MSG(("DirTree::setInRedBlackTreeForm: OOPS problem setting RedBlack colour\n"));
+			// printf(("DirTree::setInRedBlackTreeForm: OOPS problem setting RedBlack colour\n"));
 		}
 	}
 	if (firstInd!=middle)
@@ -1192,15 +1196,15 @@ void librevenge::IStorage::load()
 	if (!m_header.valid_signature())
 		return;
 
-	// sanity checks
-	m_result = librevenge::Storage::BadOLE;
-	if (!m_header.valid(getLength(m_input))) return;
-	if (m_header.m_threshold != 4096) return;
-
 	// important block size
 	m_header.compute_block_size();
 	m_bbat.m_blockSize = m_header.m_size_bbat;
 	m_sbat.m_blockSize = m_header.m_size_sbat;
+
+	// sanity checks
+	m_result = librevenge::Storage::BadOLE;
+	if (!m_header.valid(getLength(m_input))) return;
+	if (m_header.m_threshold != 4096) return;
 
 	// find blocks allocated to store big bat
 	// the first 109 blocks are in header, the rest in meta bat
@@ -1214,13 +1218,13 @@ void librevenge::IStorage::load()
 		std::vector<unsigned char> buffer2(m_bbat.m_blockSize);
 		unsigned k = 109;
 		unsigned long sector;
-		for (unsigned r = 0; r < m_header.m_num_mbat; r++)
+		for (unsigned r = 0; r < m_header.m_num_mbat && k > 0; r++)
 		{
 			if (r == 0) // 1st meta bat location is in file header.
 				sector = m_header.m_start_mbat;
 			else      // next meta bat location is the last current block value.
 				sector = blocks[--k];
-			unsigned long readData=loadBigBlock(sector, &buffer2[0], m_bbat.m_blockSize);
+			unsigned long readData=loadBigBlock(sector, buffer2.data(), m_bbat.m_blockSize);
 			for (unsigned s=0; s < m_bbat.m_blockSize; s+=4)
 			{
 				// check that for maximum block and that the data are correctly read
@@ -1234,8 +1238,8 @@ void librevenge::IStorage::load()
 	if (blocks.size()*m_bbat.m_blockSize > 0)
 	{
 		std::vector<unsigned char> buffer(blocks.size()*m_bbat.m_blockSize);
-		unsigned long readData=loadBigBlocks(blocks, &buffer[0], buffer.size());
-		m_bbat.load(&buffer[0], (unsigned)readData);
+		unsigned long readData=loadBigBlocks(blocks, buffer.data(), buffer.size());
+		m_bbat.load(buffer.data(), (unsigned)readData);
 	}
 
 	// load small bat
@@ -1244,8 +1248,8 @@ void librevenge::IStorage::load()
 	if (blocks.size()*m_bbat.m_blockSize > 0)
 	{
 		std::vector<unsigned char> buffer(blocks.size()*m_bbat.m_blockSize);
-		unsigned long readData=loadBigBlocks(blocks, &buffer[0], buffer.size());
-		m_sbat.load(&buffer[0], (unsigned)readData);
+		unsigned long readData=loadBigBlocks(blocks, buffer.data(), buffer.size());
+		m_sbat.load(buffer.data(), (unsigned)readData);
 	}
 
 	// load directory tree
@@ -1254,8 +1258,8 @@ void librevenge::IStorage::load()
 	if (blocks.size()*m_bbat.m_blockSize > 0)
 	{
 		std::vector<unsigned char> buffer(blocks.size()*m_bbat.m_blockSize);
-		unsigned long readData=loadBigBlocks(blocks, &buffer[0], buffer.size());
-		m_dirtree.load(&buffer[0], (unsigned)readData);
+		unsigned long readData=loadBigBlocks(blocks, buffer.data(), buffer.size());
+		m_dirtree.load(buffer.data(), (unsigned)readData);
 		if (readData >= 0x74 + 4)
 		{
 			unsigned sb_start = readU32(&buffer[0x74]);
@@ -1331,7 +1335,7 @@ unsigned long librevenge::IStorage::loadSmallBlocks(std::vector<unsigned long> c
 		unsigned long bbindex = pos / m_bbat.m_blockSize;
 		if (bbindex >= m_sb_blocks.size()) break;
 
-		unsigned long readData=loadBigBlock(m_sb_blocks[ bbindex ], &tmpBuf[0], m_bbat.m_blockSize);
+		unsigned long readData=loadBigBlock(m_sb_blocks[ bbindex ], tmpBuf.data(), m_bbat.m_blockSize);
 
 		// copy the data
 		unsigned long offset = pos % m_bbat.m_blockSize;
@@ -1377,7 +1381,7 @@ bool librevenge::OStorage::addStream(std::string const &name, unsigned char cons
 
 	if (!len)
 	{
-		RVNG_DEBUG_MSG(("librevengeOLE::OStorage::addStream: call to create an empty file!!!\n"));
+		// printf(("librevengeOLE::OStorage::addStream: call to create an empty file!!!\n"));
 		return true;
 	}
 	e->m_start = insertData(buffer, len, useBigBlockFor(len));
@@ -1391,7 +1395,7 @@ bool librevenge::OStorage::updateToSave()
 	DirEntry *rEntry = m_dirtree.entry(0);
 	if (!dirSize || !rEntry)
 	{
-		RVNG_DEBUG_MSG(("librevengeOLE::OStorage::updateToSave: can not find dir tree size!!!\n"));
+		//printf(("librevengeOLE::OStorage::updateToSave: can not find dir tree size!!!\n"));
 		return false;
 	}
 	m_dirtree.setInRedBlackTreeForm();
@@ -1405,9 +1409,9 @@ bool librevenge::OStorage::updateToSave()
 	{
 		// FIXME: set m_header.m_start_sbat
 		buffer.resize(sbatSize);
-		m_sbat.save(&buffer[0]);
+		m_sbat.save(buffer.data());
 		m_header.m_num_sbat = (unsigned)(sbatSize+511)/512;
-		m_header.m_start_sbat = insertData(&buffer[0], sbatSize, true, unsigned(Eof));
+		m_header.m_start_sbat = insertData(buffer.data(), sbatSize, true, unsigned(Eof));
 		if (m_sb_blocks.size())
 		{
 			rEntry->m_start =(unsigned) m_sb_blocks[0];
@@ -1417,14 +1421,14 @@ bool librevenge::OStorage::updateToSave()
 	}
 	// then add dirtree
 	buffer.resize(dirSize);
-	m_dirtree.save(&buffer[0]);
-	m_header.m_start_dirent=insertData(&buffer[0], dirSize, true, unsigned(Eof));
+	m_dirtree.save(buffer.data());
+	m_header.m_start_dirent=insertData(buffer.data(), dirSize, true, unsigned(Eof));
 
 	// now update the big alloc table to add size for self and for the meta data
 	unsigned numBBlock = m_num_bbat;
 	if (numBBlock==0)
 	{
-		RVNG_DEBUG_MSG(("librevengeOLE::OStorage::updateToSave: can not find any big block!!!\n"));
+		// printf(("librevengeOLE::OStorage::updateToSave: can not find any big block!!!\n"));
 		return false;
 	}
 	unsigned numBAlloc = (numBBlock+127)/128;
@@ -1453,8 +1457,8 @@ bool librevenge::OStorage::updateToSave()
 	if (bbatSize)
 	{
 		buffer.resize(bbatSize);
-		m_bbat.save(&buffer[0]);
-		insertData(&buffer[0], bbatSize, true, unsigned(Bat));
+		m_bbat.save(buffer.data());
+		insertData(buffer.data(), bbatSize, true, unsigned(Bat));
 	}
 
 	for (b = 0; b < numBAlloc; b++)
@@ -1482,7 +1486,7 @@ bool librevenge::OStorage::updateToSave()
 			writeU32(&buffer[wPos], Avail);
 			wPos+=4;
 		}
-		m_header.m_start_mbat = insertData((unsigned char const *)&buffer[0], 512*numMAlloc, true, unsigned(Eof));
+		m_header.m_start_mbat = insertData((unsigned char const *)buffer.data(), 512*numMAlloc, true, unsigned(Eof));
 		m_header.m_start_mbat = numBBlock+numBAlloc;
 	}
 	m_header.m_num_bat = (m_num_bbat+127)/128;
@@ -1490,15 +1494,15 @@ bool librevenge::OStorage::updateToSave()
 
 	m_data.resize((m_num_bbat+1)*512,0);
 	// save the header
-	m_header.save(&m_data[0]);
+	m_header.save(m_data.data());
 	return true;
 }
 
 unsigned librevenge::OStorage::insertData(unsigned char const *buffer, unsigned long len, bool useBigBlock, unsigned end)
 {
-	if (buffer==0 || len == 0)
+	if (buffer==nullptr || len == 0)
 	{
-		RVNG_DEBUG_MSG(("librevengeOLE::OStorage::insertData: call with no data\n"));
+		// printf(("librevengeOLE::OStorage::insertData: call with no data\n"));
 		return 0;
 	}
 
@@ -1511,7 +1515,7 @@ unsigned librevenge::OStorage::insertData(unsigned char const *buffer, unsigned 
 		chain.push_back(block);
 		size_t wPos = getDataAddress(block, useBigBlock);
 		unsigned long wSize = len > bSize ? bSize : len;
-		memcpy(&m_data[wPos], &buffer[0], wSize);
+		memcpy(&m_data[wPos], buffer, wSize);
 		buffer += bSize;
 		len -= wSize;
 	}
@@ -1559,10 +1563,10 @@ librevenge::IStream::IStream(librevenge::IStorage *s, std::string const &name) :
 	}
 
 	// sanity check of stream size
-	const unsigned maxSize = unsigned(blockSize * m_blocks.size());
+	const auto maxSize = unsigned(blockSize * m_blocks.size());
 	if (m_size > maxSize)
 	{
-		RVNG_DEBUG_MSG(("librevenge::IStream::IStream: size %lu is wrong, using an approximated value %u\n", m_size, maxSize));
+		// printf("librevenge::IStream::IStream: size %lu is wrong, using an approximated value %u\n", m_size, maxSize);
 		m_size = maxSize;
 		entry->m_size = m_size;
 	}
@@ -1602,7 +1606,7 @@ unsigned long librevenge::IStream::readUsingStorage(unsigned long pos, unsigned 
 		while (totalbytes < maxlen)
 		{
 			if (index >= m_blocks.size()) break;
-			m_iStorage->loadSmallBlock(m_blocks[index], &buf[0], m_iStorage->m_bbat.m_blockSize);
+			m_iStorage->loadSmallBlock(m_blocks[index], buf.data(), m_iStorage->m_bbat.m_blockSize);
 			unsigned long count = sBlockSize - offset;
 			if (count > maxlen-totalbytes) count = maxlen-totalbytes;
 			memcpy(data+totalbytes, &buf[offset], count);
@@ -1624,7 +1628,7 @@ unsigned long librevenge::IStream::readUsingStorage(unsigned long pos, unsigned 
 		while (totalbytes < maxlen)
 		{
 			if (index >= m_blocks.size()) break;
-			m_iStorage->loadBigBlock(m_blocks[index], &buf[0], bBlockSize);
+			m_iStorage->loadBigBlock(m_blocks[index], buf.data(), bBlockSize);
 			unsigned long count = bBlockSize - offset;
 			if (count > maxlen-totalbytes) count = maxlen-totalbytes;
 			memcpy(data+totalbytes, &buf[offset], count);
@@ -1650,7 +1654,7 @@ bool librevenge::IStream::createOleFromDirectory(IStorage *io, std::string const
 	std::vector<std::string> nodes=io->getSubStreamList(index, true);
 	if (nodes.size() <= 1)
 	{
-		RVNG_DEBUG_MSG(("librevenge::IStream::createOleFromDirectory: can not find any child for %s\n", name.c_str()));
+		// printf(("librevenge::IStream::createOleFromDirectory: can not find any child for %s\n", name.c_str()));
 		return false;
 	}
 	try
@@ -1684,7 +1688,7 @@ bool librevenge::IStream::createOleFromDirectory(IStorage *io, std::string const
 			entry=io->entry(fullName);
 			if (!entry)
 			{
-				RVNG_DEBUG_MSG(("librevenge::IStream::createOleFromDirectory: can not find child for %s\n", fullName.c_str()));
+				// printf(("librevenge::IStream::createOleFromDirectory: can not find child for %s\n", fullName.c_str()));
 				continue;
 			}
 			if (entry->is_dir())
@@ -1700,17 +1704,17 @@ bool librevenge::IStream::createOleFromDirectory(IStorage *io, std::string const
 			{
 				// a test because empty file are rare but seems to exists
 				buffer.resize(sz);
-				ok = leafStream.read(&buffer[0], sz) == sz;
+				ok = leafStream.read(buffer.data(), sz) == sz;
 				if (ok)
-					ok=storage.addStream(nodes[l], &buffer[0], sz);
+					ok=storage.addStream(nodes[l], buffer.data(), sz);
 			}
 			else
 			{
-				ok=storage.addStream(nodes[l], 0, 0);
+				ok=storage.addStream(nodes[l], nullptr, 0);
 			}
 			if (!ok)
 			{
-				RVNG_DEBUG_MSG(("librevenge::IStream::createOleFromDirectory: can not read %s\n", fullName.c_str()));
+				// printf(("librevenge::IStream::createOleFromDirectory: can not read %s\n", fullName.c_str()));
 				return false;
 			}
 		}
@@ -1744,14 +1748,12 @@ bool librevenge::IStream::createOleFromDirectory(IStorage *io, std::string const
 // =========== Storage ==========
 
 librevenge::Storage::Storage(RVNGInputStream *is) :
-	m_io(0)
+	m_io(new IStorage(is))
 {
-	m_io = new IStorage(is);
 }
 
 librevenge::Storage::~Storage()
 {
-	delete m_io;
 }
 
 librevenge::Storage::Result librevenge::Storage::result()
@@ -1769,13 +1771,13 @@ std::vector<std::string> librevenge::Storage::getSubStreamNamesList()
 	std::vector<std::string> res=m_io->getSubStreamNamesList();
 
 	// time to do some cleaning ( remove ^A, ^B, ... )
-	for (size_t i = 0; i < res.size(); ++i)
+	for (auto &re : res)
 	{
-		std::string str=res[i], finalStr("");
-		for (size_t s=0; s<str.length(); ++s)
-			if (str[s]>=32)
-				finalStr+=str[s];
-		res[i]=finalStr;
+		std::string str=re, finalStr("");
+		for (char s : str)
+			if (s>=32)
+				finalStr+=s;
+		re=finalStr;
 	}
 	return res;
 }
@@ -1783,15 +1785,13 @@ std::vector<std::string> librevenge::Storage::getSubStreamNamesList()
 // =========== Stream ==========
 
 librevenge::Stream::Stream(librevenge::Storage *storage, const std::string &name) :
-	m_io(0)
+	m_io(new librevenge::IStream(storage->m_io.get(), name))
 {
-	m_io = new librevenge::IStream(storage->m_io, name);
 }
 
 // FIXME tell parent we're gone
 librevenge::Stream::~Stream()
 {
-	if (m_io) delete m_io;
 }
 
 unsigned long librevenge::Stream::size()
@@ -1803,4 +1803,5 @@ unsigned long librevenge::Stream::read(unsigned char *data, unsigned long maxlen
 {
 	return m_io ? m_io->read(data, maxlen) : 0;
 }
+#endif // LIBVISIO_ENABLE_UNUSED
 /* vim:set shiftwidth=4 softtabstop=4 noexpandtab: */

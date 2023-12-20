@@ -20,7 +20,9 @@
 #ifndef RVNGMEMORYSTREAM_H
 #define RVNGMEMORYSTREAM_H
 
-#include <librevenge-stream/librevenge-stream.h>
+#include "RVNGDirectoryStream.h"
+#include "RVNGStream.h"
+#include "RVNGStreamImplementation.h"
 
 namespace librevenge
 {
@@ -40,7 +42,7 @@ public:
 	}
 	const char *subStreamName(unsigned)
 	{
-		return 0;
+		return nullptr;
 	}
 	bool existsSubStream(const char *)
 	{
@@ -48,11 +50,11 @@ public:
 	}
 	RVNGInputStream *getSubStreamByName(const char *)
 	{
-		return 0;
+		return nullptr;
 	}
 	RVNGInputStream *getSubStreamById(unsigned)
 	{
-		return 0;
+		return nullptr;
 	}
 	const unsigned char *read(unsigned long numBytes, unsigned long &numBytesRead);
 	int seek(long offset, RVNG_SEEK_TYPE seekType);

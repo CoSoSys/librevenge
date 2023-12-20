@@ -17,8 +17,9 @@
  * applicable instead of those above.
  */
 
+#include "librevenge.h"
+
 #include <vector>
-#include <librevenge/librevenge.h>
 
 namespace librevenge
 {
